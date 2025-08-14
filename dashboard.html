@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parky - Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-light">
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="fas fa-parking me-2"></i>ParkEasy
+            </a>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white user-menu" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-2"></i>Alice
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-history me-2"></i>Booking History</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="index.html"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <!-- Welcome Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="welcome-section">
+                    <h2 class="mb-2">Welcome back, <span class="username-highlight" id="welcomeUserName">Alice</span>! 👋</h2>
+                    <p class="mb-0">Find the perfect parking spot for your next destination</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filter Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="searchInput" class="form-label fw-semibold">Search Location</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="searchInput" placeholder="Enter mall name, location, or address">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filterType" class="form-label fw-semibold">Filter Type</label>
+                                <select class="form-select" id="filterType">
+                                    <option value="all">All Types</option>
+                                    <option value="public">Public Parking</option>
+                                    <option value="private">Private Parking</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="sortBy" class="form-label fw-semibold">Sort By</label>
+                                <select class="form-select" id="sortBy">
+                                    <option value="distance">Distance</option>
+                                    <option value="price">Price</option>
+                                    <option value="rating">Rating</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <ul class="nav nav-tabs mb-4" id="parkingTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="public-tab" data-bs-toggle="tab" data-bs-target="#public" type="button" role="tab">
+                    <i class="fas fa-building me-2"></i>Public Parking
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="private-tab" data-bs-toggle="tab" data-bs-target="#private" type="button" role="tab">
+                    <i class="fas fa-home me-2"></i>Private Parking
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="parkingTabsContent">
+            <!-- Public Parking Tab -->
+            <div class="tab-pane fade show active" id="public" role="tabpanel">
+                <div class="row g-4" id="publicParkingContainer">
+                    <!-- Public Parking Cards will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Private Parking Tab -->
+            <div class="tab-pane fade" id="private" role="tabpanel">
+                <div class="row g-4" id="privateParkingContainer">
+                    <!-- Private Parking Cards will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Modal -->
+    <div class="modal fade" id="bookingModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Book Parking Spot</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <img id="modalParkingImage" src="" alt="Parking Spot" class="img-fluid rounded mb-3">
+                            
+                            <!-- Map Section -->
+                            <div class="mb-3">
+                                <label id="mapLabel" class="form-label fw-semibold">Location (Approximate)</label>
+                                <iframe id="parkingMap" width="100%" height="200" frameborder="0" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                                <small id="mapNote" class="text-muted">Exact location will be shown after payment</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 id="modalParkingName"></h6>
+                            <p class="text-muted mb-3" id="modalParkingLocation"></p>
+                            
+                            <!-- Vehicle Details Form (for private parking) -->
+                            <div id="vehicleDetailsForm" class="mb-3">
+                                <h6 class="fw-semibold">Vehicle Details</h6>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="form-label">License Plate</label>
+                                        <input type="text" class="form-control" id="licensePlate" placeholder="e.g., KA-01-AB-1234">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Vehicle Model</label>
+                                        <input type="text" class="form-control" id="vehicleModel" placeholder="e.g., Honda City">
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <label class="form-label">KYC Document</label>
+                                    <input type="file" class="form-control" id="kycUpload" accept=".pdf,.jpg,.jpeg,.png" onchange="handleKYCUpload(event)">
+                                    <small class="text-muted">Upload Aadhar, PAN, or Driving License</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Date and Time Selection -->
+                            <div class="mb-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="bookingDate" min="">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Time Slot</label>
+                                <select class="form-select" id="bookingTimeSlot">
+                                    <option value="">Select time slot</option>
+                                    <option value="1">1 hour</option>
+                                    <option value="2">2 hours</option>
+                                    <option value="4">4 hours</option>
+                                    <option value="8">8 hours</option>
+                                    <option value="24">24 hours</option>
+                                </select>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="customRangeToggle">
+                                    <label class="form-check-label" for="customRangeToggle">Use custom time range</label>
+                                </div>
+                                <div id="customRangeContainer" class="row g-2 mt-2" style="display:none;">
+                                    <div class="col-6">
+                                        <label class="form-label">Start</label>
+                                        <input type="time" class="form-control" id="customStartTime">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">End</label>
+                                        <input type="time" class="form-control" id="customEndTime">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Payment Method Selection -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Payment Method</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="payment-card card p-2 text-center cursor-pointer selected" data-method="upi" onclick="selectPaymentMethod('upi')">
+                                            <i class="fab fa-google-pay text-primary mb-1"></i>
+                                            <small>UPI</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="payment-card card p-2 text-center cursor-pointer" data-method="gpay" onclick="selectPaymentMethod('gpay')">
+                                            <i class="fab fa-google-pay text-success mb-1"></i>
+                                            <small>Google Pay</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="payment-card card p-2 text-center cursor-pointer" data-method="phonepe" onclick="selectPaymentMethod('phonepe')">
+                                            <i class="fas fa-mobile-alt text-purple mb-1"></i>
+                                            <small>PhonePe</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="payment-card card p-2 text-center cursor-pointer" data-method="card" onclick="selectPaymentMethod('card')">
+                                            <i class="fas fa-credit-card text-info mb-1"></i>
+                                            <small>Card</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Price Display -->
+                            <div class="bg-light p-3 rounded mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Price per hour:</span>
+                                    <span id="modalPricePerHour"></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Security deposit:</span>
+                                    <span id="modalSecurityDeposit"></span>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between fw-bold">
+                                    <span>Total:</span>
+                                    <span id="modalTotalPrice"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmBookingBtn">
+                        <i class="fas fa-credit-card me-2"></i>Proceed to Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Success Modal -->
+    <div class="modal fade" id="paymentSuccessModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-check-circle me-2"></i>Booking Confirmed!
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-qrcode text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    <h4 class="text-success mb-3">Your PIN: <span id="bookingPIN" class="fw-bold">1234</span></h4>
+                    <p class="text-muted">Use this PIN to access your parking spot. Don't forget to upload an exit photo for your deposit refund!</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Important:</strong> Take a photo when you exit to get your security deposit back.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parking Layout Modal -->
+    <div class="modal fade" id="parkingLayoutModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="layoutTitle">Parking Layout</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="layoutImage" src="" alt="Parking Layout" class="img-fluid rounded">
+                    <p class="text-muted mt-3">Available parking spaces are marked in green</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parking Dimensions Modal -->
+    <div class="modal fade" id="dimensionsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="dimensionsTitle">Parking Space Dimensions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="dimensionsContent">
+                        <!-- Dimensions will be populated by JavaScript -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
