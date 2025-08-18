@@ -154,34 +154,43 @@ function initializeLoginPage() {
 }
 
 // Handle login
-function handleLogin(event) {
+async function handleLogin(event) {
     event.preventDefault();
-    
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const rememberMe = document.getElementById('rememberMe').checked;
-    
+
     if (!email || !password) {
         showAlert('Please fill in all fields', 'danger');
         return;
     }
-    
+
     showLoadingState();
-    
-    setTimeout(() => {
-        currentUser = {
-            id: 'user123',
-            name: 'Alice',
-            email: email,
-            phone: '+1234567890'
-        };
-        
-        if (rememberMe) {
-            localStorage.setItem('parkEasyUser', JSON.stringify(currentUser));
+    try {
+        const response = await fetch('http://localhost:5000/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            const user = data.user || { id: 'user', name: 'User', email };
+            currentUser = { id: user.id, name: user.fullName || user.name || 'User', email: user.email, phone: user.phone || '' };
+            if (rememberMe) {
+                localStorage.setItem('parkEasyUser', JSON.stringify(currentUser));
+            }
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+            }
+            showAlert('Login successful!', 'success');
+            setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+        } else {
+            showAlert(data.message || 'Login failed. Please check credentials.', 'danger');
         }
-        
-        window.location.href = 'dashboard.html';
-    }, 1500);
+    } catch (err) {
+        showAlert('Network error. Please ensure the backend is running.', 'danger');
+    }
 }
 
 // Google Sign-In placeholder
@@ -219,7 +228,7 @@ function initializeSignupPage() {
 }
 
 // Handle signup
-function handleSignup(event) {
+async function handleSignup(event) {
     event.preventDefault();
     
     const fullName = document.getElementById('fullName').value;
@@ -250,21 +259,24 @@ function handleSignup(event) {
     }
     
     showLoadingState();
-    
-    setTimeout(() => {
-        currentUser = {
-            id: 'user' + Date.now(),
-            name: fullName,
-            email: email,
-            phone: phone
-        };
-        
-        showAlert('Account created successfully! Redirecting to login...', 'success');
-        
-        setTimeout(() => {
-            window.location.href = 'index.html';
-        }, 2000);
-    }, 1500);
+
+    try {
+        const response = await fetch('http://localhost:5000/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fullName, email, phone, password })
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            showAlert(data.message || 'Account created successfully! Redirecting to login...', 'success');
+            setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+        } else {
+            showAlert(data.message || 'Signup failed. Please try again.', 'danger');
+        }
+    } catch (err) {
+        showAlert('Network error. Please ensure the backend is running.', 'danger');
+    }
 }
 
 // Google Sign-Up placeholder
