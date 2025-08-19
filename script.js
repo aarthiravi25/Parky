@@ -130,6 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
             break;
         case 'dashboard.html':
             initializeDashboard();
+            // ✅ Load private parking spots when dashboard loads
+            loadPrivateParking();
             break;
     }
 });
@@ -177,6 +179,9 @@ async function handleLogin(event) {
         if (response.ok) {
             const user = data.user || { id: 'user', name: 'User', email };
             currentUser = { id: user.id, name: user.fullName || user.name || 'User', email: user.email, phone: user.phone || '' };
+            // Persist session data
+            localStorage.setItem('userName', currentUser.name);
+            localStorage.setItem('userId', String(currentUser.id));
             if (rememberMe) {
                 localStorage.setItem('parkEasyUser', JSON.stringify(currentUser));
             }
@@ -269,6 +274,12 @@ async function handleSignup(event) {
         const data = await response.json().catch(() => ({}));
 
         if (response.ok) {
+            // If backend is enhanced to return user and token, persist them; otherwise just redirect
+            if (data.user && data.token) {
+                localStorage.setItem('userName', data.user.fullName || data.user.name || fullName);
+                localStorage.setItem('userId', String(data.user.id));
+                localStorage.setItem('token', data.token);
+            }
             showAlert(data.message || 'Account created successfully! Redirecting to login...', 'success');
             setTimeout(() => { window.location.href = 'index.html'; }, 1500);
         } else {
@@ -383,9 +394,7 @@ function setupDashboardEventListeners() {
         sortBy.addEventListener('change', handleSort);
     }
     
-    if (confirmBookingBtn) {
-        confirmBookingBtn.addEventListener('click', handleConfirmBooking);
-    }
+    // Do not bind sample booking handler; API handler will bind after DOM is ready
     
     if (bookingTimeSlot) {
         bookingTimeSlot.addEventListener('change', () => {
@@ -498,15 +507,10 @@ function displayPublicParking() {
 
 // Display private parking
 function displayPrivateParking() {
-    const container = document.getElementById('privateParkingContainer');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    privateParkingData.forEach(parking => {
-        const card = createPrivateParkingCard(parking);
-        container.appendChild(card);
-    });
+    // Use new backend data loading
+    if (document.getElementById('privateParkingContainer')) {
+        loadPrivateParking();
+    }
 }
 
 // Create public parking card
@@ -747,8 +751,8 @@ function applySorting(sortBy) {
     displayPrivateParking();
 }
 
-// Open booking modal
-function openBookingModal(parkingId) {
+// Legacy open booking modal (kept for backward compatibility)
+function openBookingModalLegacy(parkingId) {
     const parking = privateParkingData.find(p => p.id === parkingId);
     if (!parking) return;
     
@@ -773,8 +777,15 @@ function openBookingModal(parkingId) {
     // Show approximate map view before payment
     switchMapView(parkingId, false);
     
-    const modal = new bootstrap.Modal(document.getElementById('bookingModal'));
+    const modalEl = document.getElementById('bookingModal');
+    const modal = new bootstrap.Modal(modalEl);
     modal.show();
+    modalEl.addEventListener('shown.bs.modal', function onShown() {
+        modalEl.removeEventListener('shown.bs.modal', onShown);
+        if (spot.latitude && spot.longitude) {
+            showApproximateMap(spot.latitude, spot.longitude);
+        }
+    });
 }
 
 // Update total price
@@ -1154,4 +1165,559 @@ function updateTotalPrice() {
     document.getElementById('modalTotalPrice').textContent = `₹${total}`;
 }
 
+// ✅ Helper to color status badges
+function getStatusColor(status) {
+    if (status === "available") return "success";
+    if (status === "limited") return "warning";
+    return "danger"; // full
+}
+
+// ✅ Open booking modal with selected spot data
+function openBookingModal(spotJSON) {
+    let spot;
+    
+    // Handle both string (new format) and object (legacy format) inputs
+    if (typeof spotJSON === 'string') {
+        spot = JSON.parse(decodeURIComponent(spotJSON));
+    } else {
+        // Legacy format - find spot by ID
+        const parkingId = spotJSON;
+        spot = privateParkingData.find(p => p.id === parkingId);
+        if (!spot) return;
+    }
+    
+    currentBooking = spot;
+    selectedSpotApi = spot; // Keep compatibility with existing booking system
+
+    document.getElementById("modalParkingImage").src = spot.imageUrl || spot.image;
+    document.getElementById("modalParkingName").textContent = spot.name;
+    document.getElementById("modalParkingLocation").textContent = spot.location;
+    document.getElementById("modalPricePerHour").textContent = `₹${spot.pricePerHour}`;
+    document.getElementById("modalSecurityDeposit").textContent = `₹${spot.deposit || spot.securityDeposit}`;
+    document.getElementById("modalTotalPrice").textContent = "—"; // will update after time selection
+
+    // Example map embedding (dummy for now)
+    const mapElement = document.getElementById("parkingMap");
+    if (mapElement) {
+        mapElement.src = `https://www.google.com/maps?q=${encodeURIComponent(spot.location)}&output=embed`;
+    }
+
+    // Show modal
+    const bookingModal = new bootstrap.Modal(document.getElementById("bookingModal"));
+    bookingModal.show();
+}
+
 console.log('ParkEasy App JavaScript loaded successfully!');
+
+// ===== CONFIG =====
+const API_ORIGIN = (() => {
+    const host = window.location.hostname || 'localhost';
+    return `http://${host}:5000`;
+})();
+const API_BASE = `${API_ORIGIN}/api`;
+function getAuthToken() { return localStorage.getItem('token'); }
+
+// Redirect to login if not logged in and on dashboard
+if (!getAuthToken() && window.location.pathname.includes('dashboard.html')) {
+	window.location.href = 'index.html';
+}
+
+// ✅ Load private parking spots from backend
+async function loadPrivateParking() {
+    try {
+        const res = await fetch(`${API_BASE}/parking-spots?type=private`);
+        const spots = await res.json();
+
+        const container = document.getElementById("privateParkingContainer");
+        if (!container) return;
+        container.innerHTML = ""; // clear before inserting
+
+        spots.forEach(spot => {
+            const card = document.createElement("div");
+            card.className = "col-md-4";
+
+            const disabled = (spot.availableSlots ?? 0) <= 0;
+
+            card.innerHTML = `
+                <div class="card shadow-sm h-100">
+                    <img src="${spot.imageUrl}" class="card-img-top" alt="${spot.name}">
+                    <div class="card-body">
+                        <h5 class="card-title">${spot.name}</h5>
+                        <p class="card-text text-muted">
+                            <i class="fas fa-map-marker-alt me-2"></i>${spot.location}
+                        </p>
+                        <p>
+                            <span class="badge bg-${getStatusColor(spot.status)}">
+                                ${String(spot.status || 'available').toUpperCase()}
+                            </span>
+                            <span class="ms-2">${spot.availableSlots} / ${spot.totalSlots} slots</span>
+                        </p>
+                        <p class="mb-1"><strong>₹${spot.pricePerHour}</strong> per hour</p>
+                        <p class="mb-1">Deposit: ₹${spot.deposit}</p>
+                        <p class="mb-1">⭐ ${spot.rating ?? 4} | ${spot.distanceKm ?? 1} km away</p>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary btn-sm mt-2 view-dimensions-btn" data-id="${spot.id}">
+                                <i class="fas fa-ruler-combined me-1"></i> View Dimensions
+                            </button>
+                            <button class="btn btn-primary mt-2" ${disabled ? 'disabled' : ''}>
+                                <i class="fas fa-car me-2"></i>Book Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const btn = card.querySelector('button.btn.btn-primary');
+            if (btn && !disabled) {
+                btn.addEventListener('click', () => openBookingModalFromApi(spot));
+            }
+            const dimBtn = card.querySelector('.view-dimensions-btn');
+            if (dimBtn) {
+                dimBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openDimensionsModal(spot.id);
+                });
+            }
+
+            container.appendChild(card);
+        });
+    } catch (err) {
+        console.error("Error loading private spots:", err);
+        showAlert('Failed to load private parking spots', 'danger');
+    }
+}
+
+// ===== LEGACY: Load spots from backend (keeping for compatibility) =====
+async function loadPrivateSpotsFromApi() {
+	try {
+		const res = await fetch(`${API_BASE}/parking?type=private`);
+		const spots = await res.json();
+		renderPrivateCardsFromApi(spots);
+	} catch (e) {
+		console.error(e);
+		showAlert('Failed to load private parking spots', 'danger');
+	}
+}
+
+function renderPrivateCardsFromApi(spots) {
+	const container = document.getElementById('privateParkingContainer');
+	if (!container) return;
+	container.innerHTML = '';
+
+	spots.forEach((s) => {
+		const disabled = (s.availableSlots ?? 0) <= 0;
+		const badge = s.status === 'available' ? 'bg-success'
+			: s.status === 'limited' ? 'bg-warning'
+			: 'bg-danger';
+
+		const col = document.createElement('div');
+		col.className = 'col-md-4';
+		col.innerHTML = `
+			<div class="card h-100 shadow-sm">
+				<img src="${s.imageUrl || s.image || 'https://via.placeholder.com/600x300'}" class="card-img-top" alt="${s.name}">
+				<div class="card-body d-flex flex-column">
+					<h5 class="card-title">${s.name}</h5>
+					<p class="text-muted mb-1"><i class="fas fa-map-marker-alt me-2"></i>${s.location}</p>
+					<p class="mb-1"><i class="fas fa-star me-2"></i>${s.rating ?? 4} (${s.distanceKm ?? 1} km)</p>
+					<span class="badge ${badge} align-self-start mb-2 text-white text-capitalize">${s.status}</span>
+					<p class="mb-1"><strong>${s.availableSlots}</strong> slots available / Total: ${s.totalSlots}</p>
+					<p class="mb-2">₹${s.pricePerHour}/hr · Deposit ₹${s.deposit}</p>
+					<button class="btn btn-primary mt-auto" ${disabled ? 'disabled' : ''}>Book Now</button>
+				</div>
+			</div>
+		`;
+		col.querySelector('button').addEventListener('click', () => openBookingModalFromApi(s));
+		container.appendChild(col);
+	});
+}
+
+// ===== BOOKING MODAL (API) =====
+let selectedSpotApi = null;
+
+function openBookingModalFromApi(spot) {
+	selectedSpotApi = spot;
+	// Fill modal fields
+	document.getElementById('modalParkingImage').src = spot.imageUrl || spot.image || '';
+	document.getElementById('modalParkingName').textContent = spot.name;
+	document.getElementById('modalParkingLocation').textContent = spot.location;
+	document.getElementById('modalPricePerHour').textContent = `₹${spot.pricePerHour}`;
+	document.getElementById('modalSecurityDeposit').textContent = `₹${spot.deposit}`;
+
+	const today = new Date().toISOString().split('T')[0];
+	const dateInput = document.getElementById('bookingDate');
+	if (dateInput) {
+		dateInput.min = today;
+		if (!dateInput.value) dateInput.value = today;
+	}
+
+	const slotSel = document.getElementById('bookingTimeSlot');
+	if (slotSel) slotSel.value = '1';
+	calcApiTotal();
+
+	const modalEl = document.getElementById('bookingModal');
+	const modal = new bootstrap.Modal(modalEl);
+	modal.show();
+
+	const tryInitMap = () => {
+		try {
+			if (spot.latitude && spot.longitude && typeof L !== 'undefined') {
+				showApproximateMap(spot.latitude, spot.longitude);
+			} else if (spot.latitude && spot.longitude) {
+				const m = document.getElementById('parkingMap');
+				if (m) {
+					m.innerHTML = `<iframe src="https://www.google.com/maps?q=${spot.latitude},${spot.longitude}&z=16&output=embed" width="100%" height="220" style="border:0" loading="lazy"></iframe>`;
+					const warn = document.getElementById('approxAlert'); if (warn) warn.style.display = 'block';
+					const note = document.getElementById('mapNote'); if (note) note.style.display = '';
+				}
+			}
+		} catch (e) {
+			console.error('Map init failed:', e);
+		}
+	};
+
+	function onShown() {
+		modalEl.removeEventListener('shown.bs.modal', onShown);
+		tryInitMap();
+	}
+	modalEl.addEventListener('shown.bs.modal', onShown);
+	setTimeout(tryInitMap, 350);
+}
+
+function calcApiTotal() {
+	if (!selectedSpotApi) return;
+	const hoursSel = document.getElementById('bookingTimeSlot');
+	const hrs = parseInt((hoursSel?.value || '1'), 10);
+	const total = (selectedSpotApi.pricePerHour || 0) * hrs + (selectedSpotApi.deposit || 0);
+	const totalEl = document.getElementById('modalTotalPrice');
+	if (totalEl) totalEl.textContent = `₹${total}`;
+}
+
+document.getElementById('bookingTimeSlot')?.addEventListener('change', calcApiTotal);
+
+// ===== CONFIRM BOOKING (API) =====
+(function bindApiBookingHandler() {
+	const btn = document.getElementById('confirmBookingBtn');
+	if (!btn) return;
+	// Remove existing sample handler if present
+	try { btn.removeEventListener('click', handleConfirmBooking); } catch (e) {}
+	btn.addEventListener('click', async () => {
+		if (!selectedSpotApi) return;
+		const licensePlate = (document.getElementById('licensePlate').value || '').trim();
+		const vehicleModel  = (document.getElementById('vehicleModel').value || '').trim();
+		const bookingDate   = document.getElementById('bookingDate').value;
+		const hoursVal      = parseInt(document.getElementById('bookingTimeSlot').value || '1', 10);
+
+		if (!licensePlate || !vehicleModel || !bookingDate) {
+			showAlert('Please fill vehicle details and date', 'danger');
+			return;
+		}
+
+		try {
+			const authToken = getAuthToken();
+			if (!authToken) {
+				showAlert('Please log in again to continue booking', 'danger');
+				window.location.href = 'index.html';
+				return;
+			}
+			const res = await fetch(`${API_BASE}/bookings`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${authToken}`,
+				},
+				body: JSON.stringify({
+					parkingSpotId: selectedSpotApi.id,
+					bookingDate,
+					hours: hoursVal,
+					licensePlate,
+					vehicleModel,
+				}),
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				showAlert(err.message || 'Booking failed', 'danger');
+				return;
+			}
+			const data = await res.json();
+			// switch to exact map view (visual confirmation)
+			try {
+				if (selectedSpotApi?.latitude && selectedSpotApi?.longitude) {
+					showExactMap(selectedSpotApi.latitude, selectedSpotApi.longitude, selectedSpotApi.exactAddress);
+					const addr = document.getElementById('successExactAddress');
+					if (addr) {
+						addr.textContent = selectedSpotApi.exactAddress || '';
+						addr.style.display = 'block';
+					}
+					const link = document.getElementById('viewOnMapsBtn');
+					if (link) {
+						link.href = `https://www.google.com/maps?q=${selectedSpotApi.latitude},${selectedSpotApi.longitude}`;
+						link.style.display = 'inline-block';
+					}
+				}
+			} catch {}
+			// close booking modal
+			bootstrap.Modal.getInstance(document.getElementById('bookingModal')).hide();
+			// show success + pin + address + maps link
+			document.getElementById('bookingPIN').textContent = data.pinCode;
+			const addr = document.getElementById('successExactAddress');
+			if (addr && selectedSpotApi?.exactAddress) {
+				addr.textContent = selectedSpotApi.exactAddress;
+				addr.style.display = 'block';
+			}
+			const link = document.getElementById('viewOnMapsBtn');
+			if (link && selectedSpotApi?.latitude && selectedSpotApi?.longitude) {
+				link.href = `https://www.google.com/maps?q=${selectedSpotApi.latitude},${selectedSpotApi.longitude}`;
+				link.style.display = 'inline-block';
+			}
+			const success = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
+			success.show();
+			// refresh list
+			loadPrivateSpotsFromApi();
+		} catch (e) {
+			console.error(e);
+			showAlert('Network error while booking', 'danger');
+		}
+	});
+})();
+
+// ===== DIMENSIONS / FEATURES MODAL FETCH =====
+async function openDimensionsModal(spotId) {
+    try {
+        const res = await fetch(`${API_BASE}/parking/${spotId}/details`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        const d = (data.dimensions || [])[0] || {};
+        document.getElementById('vehicleType').textContent = d.vehicleType || '—';
+        document.getElementById('dimensionLength').textContent = d.length ?? '—';
+        document.getElementById('dimensionWidth').textContent = d.width ?? '—';
+        document.getElementById('dimensionHeight').textContent = d.height ?? '—';
+        const featWrap = document.getElementById('parkingFeatures');
+        if (featWrap) {
+            featWrap.innerHTML = (data.features || []).map(f => `
+                <div class="text-center">
+                    <i class="fas ${f.icon} fa-2x"></i>
+                    <p class="mb-0 small">${f.type}</p>
+                </div>
+            `).join('');
+        }
+        new bootstrap.Modal(document.getElementById('dimensionsModal')).show();
+    } catch (e) {
+        console.error(e);
+        showAlert('Failed to fetch dimensions & features', 'danger');
+    }
+}
+
+// (Removed legacy confirm handler to avoid duplicate binding)
+
+// ✅ Open Booking History Modal and Load Data
+async function loadBookingHistory() {
+    const authToken = getAuthToken();
+    const userName = localStorage.getItem("userName");
+    const userId = localStorage.getItem("userId");
+    
+    if (!authToken || !userName) {
+        showAlert('Please log in to view booking history', 'danger');
+        return;
+    }
+
+    // Show loading state
+    document.getElementById("bookingHistoryLoading").style.display = "block";
+    document.getElementById("bookingHistoryContent").style.display = "none";
+    document.getElementById("bookingHistoryEmpty").style.display = "none";
+
+    try {
+        // Try the authenticated endpoint first, fall back to username endpoint
+        let res;
+        if (userId) {
+            res = await fetch(`http://localhost:5000/api/bookings/user/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+        }
+        
+        // If that fails, try the username endpoint
+        if (!res || !res.ok) {
+            res = await fetch(`http://localhost:5000/api/bookings/${encodeURIComponent(userName)}`);
+        }
+
+        if (!res.ok) {
+            throw new Error('Failed to fetch bookings');
+        }
+
+        const bookings = await res.json();
+
+        // Hide loading state
+        document.getElementById("bookingHistoryLoading").style.display = "none";
+
+        if (bookings.length === 0) {
+            document.getElementById("bookingHistoryEmpty").style.display = "block";
+            return;
+        }
+
+        // Show content and populate table
+        document.getElementById("bookingHistoryContent").style.display = "block";
+        const tbody = document.getElementById("bookingHistoryTable");
+        tbody.innerHTML = "";
+
+        bookings.forEach(booking => {
+            const statusBadge = getBookingStatusBadge(booking.status);
+            const bookingDateFormatted = formatDate(booking.date);
+            const createdAtFormatted = formatDateTime(booking.createdAt);
+            
+            const row = `
+                <tr>
+                    <td>
+                        <strong>${booking.parkingName}</strong><br>
+                        <small class="text-muted">${booking.location || ''}</small>
+                    </td>
+                    <td>${bookingDateFormatted}</td>
+                    <td>${booking.timeSlot}</td>
+                    <td>
+                        ${booking.vehicleModel}<br>
+                        <small class="text-muted">${booking.licensePlate}</small>
+                    </td>
+                    <td><strong>₹${booking.totalPrice}</strong></td>
+                    <td>
+                        <span class="badge bg-secondary">${booking.pin}</span>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td>${createdAtFormatted}</td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+
+        // Modal is already shown by click handler; nothing to do here
+
+    } catch (err) {
+        console.error("Error loading bookings:", err);
+        document.getElementById("bookingHistoryLoading").style.display = "none";
+        showAlert('Could not load booking history. Please try again.', 'danger');
+    }
+}
+
+// Helper function to get status badge
+function getBookingStatusBadge(status) {
+    switch (status?.toLowerCase()) {
+        case 'active':
+            return '<span class="badge bg-success">Active</span>';
+        case 'completed':
+            return '<span class="badge bg-primary">Completed</span>';
+        case 'cancelled':
+            return '<span class="badge bg-danger">Cancelled</span>';
+        default:
+            return '<span class="badge bg-secondary">Unknown</span>';
+    }
+}
+
+// Helper function to format date
+function formatDate(dateString) {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch {
+        return dateString;
+    }
+}
+
+// Helper function to format date and time
+function formatDateTime(dateString) {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return dateString;
+    }
+}
+
+// ✅ Bind Booking History link in navbar
+document.addEventListener('DOMContentLoaded', () => {
+    const historyLink = document.getElementById('navBookingHistory');
+    if (historyLink) {
+        historyLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Show modal immediately with loading state
+            const modalEl = document.getElementById('bookingHistoryModal');
+            if (modalEl) {
+                document.getElementById('bookingHistoryLoading').style.display = 'block';
+                document.getElementById('bookingHistoryContent').style.display = 'none';
+                document.getElementById('bookingHistoryEmpty').style.display = 'none';
+                new bootstrap.Modal(modalEl).show();
+            }
+            loadBookingHistory();
+        });
+    }
+});
+
+// ===== Map helpers (Leaflet) =====
+let leafletMap;
+let leafletLayer;
+let approxCircle;
+let currentMarker;
+
+function metersToDegreesLat(m) { return m / 111320; }
+function metersToDegreesLng(m, lat) { return m / (111320 * Math.cos((lat * Math.PI) / 180)); }
+
+function maskedCoords(lat, lng, radiusM = 200) {
+    const angle = Math.random() * 2 * Math.PI;
+    const r = Math.random() * radiusM;
+    const dLat = metersToDegreesLat(r * Math.sin(angle));
+    const dLng = metersToDegreesLng(r * Math.cos(angle), lat);
+    return { lat: lat + dLat, lng: lng + dLng };
+}
+
+function ensureMap() {
+    if (!leafletMap) {
+        leafletMap = L.map('parkingMap', { zoomControl: true });
+        leafletLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors',
+        }).addTo(leafletMap);
+    } else {
+        setTimeout(() => leafletMap.invalidateSize(), 50);
+    }
+}
+
+function showApproximateMap(lat, lng) {
+    ensureMap();
+    const { lat: mLat, lng: mLng } = maskedCoords(lat, lng, 200);
+    if (currentMarker) leafletMap.removeLayer(currentMarker);
+    if (approxCircle) leafletMap.removeLayer(approxCircle);
+    currentMarker = L.marker([mLat, mLng]).addTo(leafletMap);
+    approxCircle = L.circle([mLat, mLng], { radius: 200 }).addTo(leafletMap);
+    leafletMap.setView([mLat, mLng], 16);
+    document.getElementById('mapLabel').textContent = 'Location (Approximate)';
+    const note = document.getElementById('mapNote'); if (note) note.style.display = '';
+    const warn = document.getElementById('approxAlert'); if (warn) warn.style.display = 'block';
+    const exactDiv = document.getElementById('exactAddress'); if (exactDiv) exactDiv.style.display = 'none';
+}
+
+function showExactMap(lat, lng, exactAddress) {
+    ensureMap();
+    if (approxCircle) { leafletMap.removeLayer(approxCircle); approxCircle = null; }
+    if (currentMarker) { leafletMap.removeLayer(currentMarker); currentMarker = null; }
+    currentMarker = L.marker([lat, lng]).addTo(leafletMap);
+    leafletMap.setView([lat, lng], 17);
+    document.getElementById('mapLabel').textContent = 'Exact Location';
+    const note = document.getElementById('mapNote'); if (note) note.style.display = 'none';
+    const warn = document.getElementById('approxAlert'); if (warn) warn.style.display = 'none';
+    const exactDiv = document.getElementById('exactAddress');
+    if (exactDiv) {
+        exactDiv.innerHTML = `<i class="fa fa-location-dot me-2"></i>${exactAddress || ''}`;
+        exactDiv.style.display = 'block';
+    }
+}
+// =================================
+
+// ===== INIT (override sample data with API) =====
+// Note: loadPrivateParking() is now called from the main DOMContentLoaded listener

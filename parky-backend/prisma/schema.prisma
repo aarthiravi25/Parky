@@ -19,4 +19,73 @@ model User {
   provider  String   @default("email") // "email" | "google" | "phone"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+// Parking spot listings (public or private)
+model ParkingSpot {
+  id             Int       @id @default(autoincrement())
+  name           String
+  type           String    @default("private") // "private" | "public"
+  location       String
+  pricePerHour   Float
+  deposit        Float     @default(0)
+  status         String    @default("available") // available | limited | full
+  totalSlots     Int
+  availableSlots Int
+  imageUrl       String?
+  rating         Float?    @default(4.0)
+  distanceKm     Float?    @default(1.0)
+  createdAt      DateTime  @default(now())
+
+  // NEW geo/address fields
+  latitude       Float
+  longitude      Float
+  exactAddress   String?
+
+  bookings       Booking[]
+  features       ParkingFeature[]
+  dimensions     ParkingDimension[]
+}
+
+// New: Feature tags for a spot (e.g., CCTV, Lighting, Wide area)
+model ParkingFeature {
+  id            Int          @id @default(autoincrement())
+  parkingSpotId Int
+  type          String
+  icon          String
+
+  parkingSpot   ParkingSpot  @relation(fields: [parkingSpotId], references: [id])
+}
+
+// New: Dimension recommendations by vehicle type
+model ParkingDimension {
+  id            Int          @id @default(autoincrement())
+  parkingSpotId Int
+  vehicleType   String
+  length        Float
+  width         Float
+  height        Float
+
+  parkingSpot   ParkingSpot  @relation(fields: [parkingSpotId], references: [id])
+}
+// Parking bookings made by users
+model Booking {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  parkingSpotId Int
+  licensePlate  String
+  vehicleModel  String
+  bookingDate   DateTime
+  hours         Int
+  startTime     DateTime?
+  endTime       DateTime?
+  totalPrice    Float
+  pinCode       String
+  status        String    @default("active") // active | completed | cancelled
+  createdAt     DateTime  @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+  parkingSpot ParkingSpot @relation(fields: [parkingSpotId], references: [id])
 }
