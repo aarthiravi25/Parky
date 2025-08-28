@@ -1,4 +1,4 @@
-# 🚗 ParkEasy - Parking Rental App
+# 🚗 Parky - Parking Rental App
 
 A complete, mobile-first parking rental application built with HTML5, CSS3, JavaScript, and Bootstrap. Perfect for beginners learning web development!
 
@@ -271,5 +271,6 @@ Use this as a foundation to build your own projects and continue learning web de
 **Happy Coding! 🚀**
 #   P a r k y 
  
- #   P a r k y  
+ #   P a r k y 
+ 
  

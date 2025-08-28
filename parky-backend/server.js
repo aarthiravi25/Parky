@@ -112,6 +112,41 @@ function authRequired(req, res, next) {
   }
 }
 
+// ---- Current user profile ----
+app.get('/api/me', authRequired, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: Number(req.user.id) }, select: { id: true, fullName: true, email: true, phone: true, provider: true, createdAt: true } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.patch('/api/me', authRequired, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const { fullName, email } = req.body;
+    const data = {};
+    if (typeof fullName === 'string' && fullName.trim()) data.fullName = fullName.trim();
+    if (typeof email === 'string' && email.trim()) data.email = email.trim();
+    if (Object.keys(data).length === 0) return res.status(400).json({ message: 'No changes provided' });
+
+    // If email is changing, ensure unique
+    if (data.email) {
+      const existing = await prisma.user.findFirst({ where: { email: data.email, NOT: { id: userId } } });
+      if (existing) return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    const updated = await prisma.user.update({ where: { id: userId }, data, select: { id: true, fullName: true, email: true, phone: true } });
+    res.json({ message: 'Profile updated', user: updated });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ---- List parking spots (filter by type=public|private) ----
 app.get('/api/parking', async (req, res) => {
   try {
@@ -204,6 +239,41 @@ app.post('/api/bookings', authRequired, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---- Cancel booking (requires auth) ----
+app.patch('/api/bookings/:id/cancel', authRequired, async (req, res) => {
+  try {
+    const bookingId = Number(req.params.id);
+    if (!bookingId) return res.status(400).json({ message: 'Invalid booking id' });
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    if (booking.userId !== Number(req.user.id)) return res.status(403).json({ message: 'Not allowed' });
+    if (booking.status !== 'active') return res.status(400).json({ message: 'Only active bookings can be cancelled' });
+
+    const spot = await prisma.parkingSpot.findUnique({ where: { id: booking.parkingSpotId } });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.update({ where: { id: bookingId }, data: { status: 'cancelled' } });
+
+      if (spot) {
+        const newAvailable = (spot.availableSlots || 0) + 1;
+        await tx.parkingSpot.update({
+          where: { id: spot.id },
+          data: {
+            availableSlots: { increment: 1 },
+            status: newAvailable <= 0 ? 'full' : 'available',
+          },
+        });
+      }
+    });
+
+    return res.json({ message: 'Booking cancelled' });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: 'Failed to cancel booking' });
   }
 });
 

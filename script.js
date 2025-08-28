@@ -9,6 +9,7 @@ let selectedVehicleType = 'car'; // Default vehicle type (global fallback)
 // Vehicle selection state per listing
 const listingVehicleSelection = {}; // { [listingId]: 'bike' | 'car' | 'van' }
 let selectedPaymentMethod = 'upi'; // Default payment method
+let lastCreatedBookingId = null; // Track latest booking to enable cancel
 
 // Sample data (will be replaced with Firebase data later)
 const samplePublicParking = [
@@ -39,8 +40,8 @@ const samplePublicParking = [
         type: 'public',
         rating: 4.2,
         distance: '1.2 km',
-        hasStructuredParking: false,
-        parkingLayout: null
+        hasStructuredParking: true,
+        parkingLayout: 'park.png'
     },
     {
         id: 'pub3',
@@ -325,7 +326,7 @@ function initializeDashboard() {
 
 // Check user authentication
 function checkUserAuthentication() {
-    const savedUser = localStorage.getItem('parkEasyUser');
+    const savedUser = localStorage.getItem('parkEasyUser') || localStorage.getItem('parkyUser');
     
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
@@ -1207,7 +1208,7 @@ function openBookingModal(spotJSON) {
     bookingModal.show();
 }
 
-console.log('ParkEasy App JavaScript loaded successfully!');
+console.log('Parky App JavaScript loaded successfully!');
 
 // ===== CONFIG =====
 const API_ORIGIN = (() => {
@@ -1234,17 +1235,18 @@ async function loadPrivateParking() {
 
         spots.forEach(spot => {
             const card = document.createElement("div");
-            card.className = "col-md-4";
+            card.className = "col-12 col-sm-6 col-lg-4 d-flex";
 
             const disabled = (spot.availableSlots ?? 0) <= 0;
 
             card.innerHTML = `
-                <div class="card shadow-sm h-100">
+                <div class="card shadow-sm h-100 w-100">
                     <img src="${spot.imageUrl}" class="card-img-top" alt="${spot.name}">
                     <div class="card-body">
                         <h5 class="card-title">${spot.name}</h5>
                         <p class="card-text text-muted">
                             <i class="fas fa-map-marker-alt me-2"></i>${spot.location}
+                            <small class="text-muted d-block">Exact address after payment</small>
                         </p>
                         <p>
                             <span class="badge bg-${getStatusColor(spot.status)}">
@@ -1259,6 +1261,9 @@ async function loadPrivateParking() {
                             <button class="btn btn-outline-secondary btn-sm mt-2 view-dimensions-btn" data-id="${spot.id}">
                                 <i class="fas fa-ruler-combined me-1"></i> View Dimensions
                             </button>
+                            <a class="btn btn-outline-secondary btn-sm mt-2" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.location)}" target="_blank">
+                                <i class="fas fa-map-marker-alt me-1"></i> View Area
+                            </a>
                             <button class="btn btn-primary mt-2" ${disabled ? 'disabled' : ''}>
                                 <i class="fas fa-car me-2"></i>Book Now
                             </button>
@@ -1311,9 +1316,9 @@ function renderPrivateCardsFromApi(spots) {
 			: 'bg-danger';
 
 		const col = document.createElement('div');
-		col.className = 'col-md-4';
+		col.className = 'col-12 col-sm-6 col-lg-4 d-flex';
 		col.innerHTML = `
-			<div class="card h-100 shadow-sm">
+			<div class="card h-100 w-100 shadow-sm">
 				<img src="${s.imageUrl || s.image || 'https://via.placeholder.com/600x300'}" class="card-img-top" alt="${s.name}">
 				<div class="card-body d-flex flex-column">
 					<h5 class="card-title">${s.name}</h5>
@@ -1459,6 +1464,7 @@ document.getElementById('bookingTimeSlot')?.addEventListener('change', calcApiTo
 			bootstrap.Modal.getInstance(document.getElementById('bookingModal')).hide();
 			// show success + pin + address + maps link
 			document.getElementById('bookingPIN').textContent = data.pinCode;
+			lastCreatedBookingId = data.bookingId || null;
 			const addr = document.getElementById('successExactAddress');
 			if (addr && selectedSpotApi?.exactAddress) {
 				addr.textContent = selectedSpotApi.exactAddress;
@@ -1564,7 +1570,9 @@ async function loadBookingHistory() {
             const statusBadge = getBookingStatusBadge(booking.status);
             const bookingDateFormatted = formatDate(booking.date);
             const createdAtFormatted = formatDateTime(booking.createdAt);
-            
+            const canCancel = String(booking.status || '').toLowerCase() === 'active';
+            const cancelBtn = canCancel ? `<button class="btn btn-sm btn-danger" data-booking-id="${booking.id}"><i class=\"fas fa-ban me-1\"></i>Cancel</button>` : '';
+
             const row = `
                 <tr>
                     <td>
@@ -1583,9 +1591,19 @@ async function loadBookingHistory() {
                     </td>
                     <td>${statusBadge}</td>
                     <td>${createdAtFormatted}</td>
+                    <td>${cancelBtn}</td>
                 </tr>
             `;
             tbody.innerHTML += row;
+        });
+
+        // Bind cancel actions
+        tbody.querySelectorAll('button.btn-danger[data-booking-id]').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const id = btn.getAttribute('data-booking-id');
+                await cancelBookingById(id);
+            });
         });
 
         // Modal is already shown by click handler; nothing to do here
@@ -1658,7 +1676,47 @@ document.addEventListener('DOMContentLoaded', () => {
             loadBookingHistory();
         });
     }
+
+    // Bind cancel button in success modal
+    const cancelBtn = document.getElementById('cancelBookingBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', async () => {
+            if (!lastCreatedBookingId) {
+                showAlert('No recent booking to cancel', 'warning');
+                return;
+            }
+            await cancelBookingById(lastCreatedBookingId);
+        });
+    }
 });
+
+// Cancel booking helper
+async function cancelBookingById(bookingId) {
+    try {
+        const token = getAuthToken();
+        if (!token) {
+            showAlert('Please log in again', 'danger');
+            window.location.href = 'index.html';
+            return;
+        }
+        const res = await fetch(`${API_BASE}/bookings/${bookingId}/cancel`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showAlert(data.message || 'Cancel failed', 'danger');
+            return;
+        }
+        showAlert('Booking cancelled', 'success');
+        try { bootstrap.Modal.getInstance(document.getElementById('paymentSuccessModal'))?.hide(); } catch {}
+        loadPrivateSpotsFromApi();
+        try { await loadBookingHistory(); } catch {}
+    } catch (e) {
+        console.error(e);
+        showAlert('Network error during cancellation', 'danger');
+    }
+}
 
 // ===== Map helpers (Leaflet) =====
 let leafletMap;
