@@ -1,276 +1,201 @@
-# 🚗 Parky - Parking Rental App
+# 🅿️ Parky - Smart Parking Solution
 
-A complete, mobile-first parking rental application built with HTML5, CSS3, JavaScript, and Bootstrap. Perfect for beginners learning web development!
+A modern web application that connects users with available parking spots in real-time. Book private and public parking spaces with ease using our intuitive interface.
 
-## ✨ Features
+![Parky Dashboard](https://img.shields.io/badge/Status-Live-brightgreen)
+![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+![License](https://img.shields.io/badge/License-MIT-yellow)
 
-### 🔐 **Authentication System**
-- **Email/Password Login** - Traditional login with validation
-- **Google Sign-In** - Ready for Firebase integration
-- **Phone OTP** - Phone number verification (Firebase ready)
-- **Remember Me** - Persistent login sessions
-- **Form Validation** - Client-side validation with user feedback
+##  Features
 
-### 👤 **User Dashboard**
-- **Public Parking Tab** - Search mall/theater parking with real-time availability and parking layouts
-- **Private Parking Tab** - Find private spots with pricing, security features, and dimensions
-- **Google Maps Integration** - Exact locations for public parking, approximate for private (before payment)
-- **Vehicle Type Selection** - Interactive cards for Bike, Car, and Van selection
-- **Security Features** - CCTV and lighting indicators with risk warnings
-- **Search & Filter** - Find parking by location, type, and sort by various criteria
-- **Responsive Cards** - Beautiful parking spot displays with images and details
+###  **Smart Parking Discovery**
+- **Public Parking**: Find available slots in malls, plazas, and commercial areas
+- **Private Parking**: Rent residential and private parking spaces
+- **Real-time Availability**: Live updates on parking slot availability
+- **Location-based Search**: Find parking near your destination
 
-### 📱 **Booking System**
-- **Time Slot Selection** - Choose from 1 hour to 24 hours
-- **Vehicle Type Selection** - Bike, Car, and Van options with visual cards
-- **Price Calculation** - Automatic total price calculation in Indian Rupees (₹)
-- **Multiple Payment Methods** - UPI, Google Pay, PhonePe, and Card payments
-- **KYC Integration** - Document upload for vehicle registration
-- **PIN Generation** - Secure access codes for parking spots
-- **Exit Photo Upload** - Deposit refund system (placeholder)
+###  **Advanced Booking System**
+- **Vehicle Type Selection**: Choose from Bike, Car, or Van options
+- **Flexible Time Slots**: Book for 1, 2, 4, 8, or 24 hours
+- **Custom Time Range**: Set your own start and end times
+- **Secure PIN System**: Get unique access PINs for your bookings
 
-### 🎨 **Design Features**
-- **Mobile-First** - Optimized for all device sizes
-- **Bootstrap 5** - Modern, responsive framework
-- **Custom CSS** - Enhanced styling with animations
-- **Font Awesome Icons** - Professional iconography
-- **Smooth Animations** - Hover effects and transitions
+###  **Payment Integration**
+- **Multiple Payment Methods**: UPI, Google Pay, PhonePe, and Card payments
+- **Security Deposits**: Refundable deposits for private parking
+- **Transparent Pricing**: Clear breakdown of hourly rates and deposits
+
+###  **Location Services**
+- **Interactive Maps**: View approximate locations before booking
+- **Exact Address Access**: Get precise addresses after payment confirmation
+- **Google Maps Integration**: Direct navigation to your parking spot
+- **Safety Features**: Approximate locations shown for security
+
+###  **User Management**
+- **Secure Authentication**: Email/password login with JWT tokens
+- **User Profiles**: Manage your personal information
+- **Booking History**: Track all your past and current bookings
+- **Booking Management**: Cancel bookings and manage reservations
+
+##  Technology Stack
+
+### **Frontend**
+- **HTML5** - Semantic markup and structure
+- **CSS3** - Modern styling with Bootstrap 5.3.0
+- **JavaScript (ES6+)** - Interactive functionality
+- **Bootstrap** - Responsive UI components
+- **Leaflet.js** - Interactive maps
+- **Font Awesome** - Icons and visual elements
+
+### **Backend**
+- **Node.js** - Server runtime environment
+- **Express.js** - Web application framework
+- **Prisma** - Database ORM and management
+- **SQLite** - Lightweight database
+- **JWT** - Authentication tokens
+- **bcryptjs** - Password hashing
+
+### **Database Schema**
+- **Users** - User accounts and authentication
+- **ParkingSpots** - Available parking locations
+- **Bookings** - User reservations and history
+- **ParkingFeatures** - Spot amenities and features
+- **ParkingDimensions** - Vehicle compatibility data
 
 ## 🚀 Quick Start
 
-### 1. **Download Files**
-All files are ready to use:
-- `index.html` - Login page
-- `signup.html` - Registration page  
-- `dashboard.html` - Main user dashboard
-- `style.css` - Custom styling
-- `script.js` - App functionality
+### **Prerequisites**
+- Node.js (v14 or higher)
+- npm or yarn package manager
+- Git
 
-### 2. **Run the App**
-```bash
-# Option 1: Python HTTP Server
-python -m http.server 8000
+### **Installation**
 
-# Option 2: Node.js HTTP Server
-npx http-server
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/parky.git
+   cd parky
+   ```
 
-# Option 3: VS Code Live Server Extension
-# Right-click index.html → "Open with Live Server"
+2. **Install backend dependencies**
+   ```bash
+   cd parky-backend
+   npm install
+   ```
+
+3. **Set up the database**
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   npx prisma db seed
+   ```
+
+4. **Start the backend server**
+   ```bash
+   npm start
+   ```
+   The API will be available at `http://localhost:5000`
+
+5. **Open the frontend**
+   - Open `dashboard.html` in your web browser
+   - Or serve it using a local server (Live Server, Python's http.server, etc.)
+
+## 📱 Usage
+
+### **For Users**
+
+1. **Sign Up/Login**
+   - Create an account with email and password
+   - Or use the demo credentials for testing
+
+2. **Find Parking**
+   - Browse public or private parking options
+   - Use filters to narrow down your search
+   - View parking details, pricing, and availability
+
+3. **Book a Spot**
+   - Select your vehicle type (Bike/Car/Van)
+   - Choose date and time duration
+   - Fill in vehicle details and upload KYC documents
+   - Select payment method and proceed
+
+4. **Access Your Parking**
+   - Receive a unique PIN for parking access
+   - Get exact address and Google Maps link
+   - Use the PIN to access your reserved spot
+
+### **For Developers**
+
+1. **API Endpoints**
+   ```
+   POST /signup - User registration
+   POST /auth/login - User authentication
+   GET /api/parking-spots - List parking spots
+   POST /api/bookings - Create new booking
+   GET /api/bookings/user/:id - User booking history
+   ```
+
+2. **Database Operations**
+   ```bash
+   npx prisma studio  # Open database GUI
+   npx prisma db reset  # Reset database
+   npx prisma migrate dev  # Run migrations
+   ```
+
+## 🏗️ Project Structure
+
+```
+parky/
+├── 📁 parky-backend/
+│   ├── 📄 server.js          # Main server file
+│   ├── 📄 package.json       # Backend dependencies
+│   ├── 📁 prisma/
+│   │   ├── 📄 schema.prisma  # Database schema
+│   │   ├── 📄 seed.js        # Sample data
+│   │   └── 📁 migrations/    # Database migrations
+│   └── 📁 node_modules/      # Backend dependencies
+├── 📄 index.html             # Login page
+├── 📄 signup.html            # Registration page
+├── 📄 dashboard.html         # Main application
+├── 📄 profile.html           # User profile
+├── 📄 script.js              # Frontend JavaScript
+├── 📄 style.css              # Custom styles
+├── 📁 images/                # Parking spot images
+└── 📄 README.md              # This file
 ```
 
-### 3. **Open in Browser**
-Navigate to `http://localhost:8000` (or your server port)
+## 🔧 Configuration
 
-## 📱 **How to Use**
-
-### **Step 1: Create Account**
-1. Open `signup.html`
-2. Fill in your details (name, email, phone, password)
-3. Agree to terms and click "Create Account"
-4. You'll be redirected to login
-
-### **Step 2: Login**
-1. Enter your email and password
-2. Check "Remember Me" if desired
-3. Click "Sign In" to access dashboard
-
-### **Step 3: Find Parking**
-1. **Public Parking Tab**: View mall/theater parking with available slots
-2. **Private Parking Tab**: Browse private spots with pricing
-3. Use search bar to find specific locations
-4. Filter by parking type or sort by distance/price/rating
-
-### **Step 4: Book Parking**
-1. Click "Book Now" on any private parking spot
-2. Select your date and time slot
-3. Review pricing (hourly rate + security deposit)
-4. Click "Proceed to Payment"
-5. Receive your access PIN
-
-## 🛠 **Technical Details**
-
-### **Frontend Technologies**
-- **HTML5** - Semantic markup and accessibility
-- **CSS3** - Custom properties, animations, responsive design
-- **JavaScript (ES6+)** - Modern JS with async/await patterns
-- **Bootstrap 5** - Responsive grid system and components
-
-### **Code Structure**
-```
-script.js
-├── Authentication Functions
-│   ├── handleLogin()
-│   ├── handleSignup()
-│   └── handleGoogleSignIn()
-├── Dashboard Functions
-│   ├── displayPublicParking()
-│   ├── displayPrivateParking()
-│   └── handleSearch()
-├── Booking System
-│   ├── openBookingModal()
-│   ├── updateTotalPrice()
-│   └── handleConfirmBooking()
-└── Utility Functions
-    ├── showAlert()
-    └── showLoadingState()
+### **Environment Variables**
+Create a `.env` file in the `parky-backend` directory:
+```env
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="your-secret-key-here"
+PORT=5000
 ```
 
-### **Data Management**
-- **Sample Data** - Mock parking spots for demonstration
-- **Local Storage** - User session management
-- **State Management** - Global variables for app state
-- **Event Handling** - Responsive user interactions
+### **Database Configuration**
+The app uses SQLite by default. To use a different database:
+1. Update the `DATABASE_URL` in `.env`
+2. Modify `schema.prisma` if needed
+3. Run `npx prisma db push`
 
-## 🔥 **Firebase Integration (Future)**
+## 🧪 Testing
 
-The app is designed to easily integrate with Firebase:
+### **Sample Data**
+The database comes pre-seeded with:
+- **6 Private Parking Spots** across Chennai
+- **3 Public Parking Locations** (VR Mall, Spencer Plaza, Express Avenue)
+- **Sample User Accounts** for testing
 
-### **Authentication**
-```javascript
-// Replace current login with Firebase Auth
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-const auth = getAuth();
+### **Demo Credentials**
+```
+Email: demo@parky.com
+Password: demo123
 ```
 
-### **Database**
-```javascript
-// Replace sample data with Firestore
-import { getFirestore, collection, addDoc } from 'firebase/firestore';
-const db = getFirestore();
-```
+<div align="center">
 
-### **Storage**
-```javascript
-// Store parking images and exit photos
-import { getStorage, ref, uploadBytes } from 'firebase/storage';
-const storage = getStorage();
-```
+**Made with ❤️ for better parking experiences**
 
-## 📱 **Mobile Responsiveness**
-
-The app is fully responsive across all devices:
-
-- **Mobile (< 576px)** - Single column layout, touch-friendly buttons
-- **Tablet (576px - 768px)** - Two-column grid, optimized spacing
-- **Desktop (> 768px)** - Three-column grid, full feature set
-
-## 🎯 **Learning Features**
-
-### **For Beginners**
-- **Well-commented code** - Every function explained
-- **Modular structure** - Easy to understand and modify
-- **Progressive enhancement** - Start simple, add features gradually
-- **Real-world patterns** - Industry-standard coding practices
-
-### **Code Examples**
-```javascript
-// Simple event listener
-document.getElementById('loginForm').addEventListener('submit', handleLogin);
-
-// Modern async/await pattern
-async function saveBooking(bookingData) {
-    try {
-        const result = await saveToDatabase(bookingData);
-        return result;
-    } catch (error) {
-        console.error('Error:', error);
-    }
-}
-```
-
-## 🚧 **Customization Guide**
-
-### **Change Colors**
-Edit `style.css` variables:
-```css
-:root {
-    --primary-color: #0d6efd;    /* Main brand color */
-    --secondary-color: #6c757d;  /* Secondary text */
-    --success-color: #198754;    /* Success states */
-}
-```
-
-### **Add New Features**
-1. **New Page**: Create HTML file and add to navigation
-2. **New Function**: Add to `script.js` with proper event listeners
-3. **New Style**: Add CSS classes to `style.css`
-
-### **Modify Data Structure**
-Update the sample data arrays in `script.js`:
-```javascript
-const samplePublicParking = [
-    {
-        id: 'new1',
-        name: 'New Parking Spot',
-        location: 'New Location',
-        // ... other properties
-    }
-];
-```
-
-## 🐛 **Troubleshooting**
-
-### **Common Issues**
-1. **Page not loading** - Check if using HTTP server (not file://)
-2. **Images not showing** - Verify internet connection for Unsplash images
-3. **JavaScript errors** - Check browser console for error messages
-4. **Styling issues** - Ensure Bootstrap CSS is loading properly
-
-### **Browser Support**
-- **Chrome/Edge** - Full support
-- **Firefox** - Full support  
-- **Safari** - Full support
-- **Mobile browsers** - Full support
-
-## 📚 **Next Steps**
-
-### **Immediate Improvements**
-1. **Add more parking spots** - Expand sample data
-2. **Implement real images** - Replace Unsplash URLs with local images
-3. **Add user profiles** - Profile management system
-4. **Booking history** - Track past reservations
-
-### **Advanced Features**
-1. **Real-time updates** - Live parking availability
-2. **Payment gateway** - Integrate Stripe/Razorpay
-3. **Push notifications** - Booking reminders
-4. **Map integration** - Google Maps for location
-
-### **Backend Integration**
-1. **Firebase setup** - Authentication and database
-2. **API development** - RESTful endpoints
-3. **Cloud functions** - Serverless backend logic
-4. **Security rules** - Data protection
-
-## 🤝 **Contributing**
-
-This is a learning project! Feel free to:
-- **Fork the code** - Make your own version
-- **Add features** - Enhance functionality
-- **Improve design** - Better UI/UX
-- **Fix bugs** - Report and fix issues
-- **Share improvements** - Help other learners
-
-## 📄 **License**
-
-This project is open source and available under the MIT License.
-
-## 🎉 **Congratulations!**
-
-You now have a fully functional parking rental app! This project demonstrates:
-- **Modern web development** practices
-- **Responsive design** principles  
-- **JavaScript** programming concepts
-- **User experience** design
-- **Code organization** and structure
-
-Use this as a foundation to build your own projects and continue learning web development!
-
----
-
-**Happy Coding! 🚀**
-#   P a r k y 
- 
- #   P a r k y 
- 
- 
+</div>

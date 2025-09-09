@@ -46,7 +46,19 @@ app.post("/signup", async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "Signup successful", userId: user.id });
+    // Generate JWT token for immediate login
+    const token = jwt.sign({ sub: user.id, email: user.email, name: user.fullName }, JWT_SECRET, { expiresIn: "7d" });
+
+    res.status(201).json({ 
+      message: "Signup successful", 
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+      },
+      token
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Something went wrong" });

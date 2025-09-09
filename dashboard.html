@@ -29,7 +29,7 @@
                         <li><a class="dropdown-item" href="profile.html"><i class="fas fa-user me-2"></i>Profile</a></li>
                         <li><a class="dropdown-item" id="navBookingHistory" href="#"><i class="fas fa-history me-2"></i>Booking History</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="index.html"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
                     </ul>
                 </div>
             </div>
@@ -395,11 +395,18 @@
     <script src="script.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const token = localStorage.getItem('token');
         const name = localStorage.getItem('userName');
-        if (!name) {
+        const userId = localStorage.getItem('userId');
+        
+        if (!token || !name || !userId) {
+            // Clear any inconsistent data and redirect
+            localStorage.removeItem('parkEasyUser');
+            localStorage.removeItem('parkyUser');
             window.location.href = 'index.html';
             return;
         }
+        
         const navbarName = document.getElementById('userName');
         if (navbarName) navbarName.innerHTML = `<i class="fas fa-user-circle me-2"></i>${name}`;
         const welcomeName = document.getElementById('welcomeUserName');

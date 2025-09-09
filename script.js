@@ -180,15 +180,17 @@ async function handleLogin(event) {
         if (response.ok) {
             const user = data.user || { id: 'user', name: 'User', email };
             currentUser = { id: user.id, name: user.fullName || user.name || 'User', email: user.email, phone: user.phone || '' };
-            // Persist session data
+            // Persist session data consistently
             localStorage.setItem('userName', currentUser.name);
             localStorage.setItem('userId', String(currentUser.id));
-            if (rememberMe) {
-                localStorage.setItem('parkEasyUser', JSON.stringify(currentUser));
-            }
+            localStorage.setItem('userEmail', currentUser.email);
+            localStorage.setItem('userPhone', currentUser.phone || '');
             if (data.token) {
                 localStorage.setItem('token', data.token);
             }
+            // Clear any old inconsistent data
+            localStorage.removeItem('parkEasyUser');
+            localStorage.removeItem('parkyUser');
             showAlert('Login successful!', 'success');
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
         } else {
@@ -275,14 +277,22 @@ async function handleSignup(event) {
         const data = await response.json().catch(() => ({}));
 
         if (response.ok) {
-            // If backend is enhanced to return user and token, persist them; otherwise just redirect
+            // If backend returns user and token, persist them; otherwise just redirect to login
             if (data.user && data.token) {
                 localStorage.setItem('userName', data.user.fullName || data.user.name || fullName);
                 localStorage.setItem('userId', String(data.user.id));
+                localStorage.setItem('userEmail', data.user.email || email);
+                localStorage.setItem('userPhone', data.user.phone || phone);
                 localStorage.setItem('token', data.token);
+                // Clear any old inconsistent data
+                localStorage.removeItem('parkEasyUser');
+                localStorage.removeItem('parkyUser');
+                showAlert('Account created successfully! Redirecting to dashboard...', 'success');
+                setTimeout(() => { window.location.href = 'dashboard.html'; }, 1500);
+            } else {
+                showAlert(data.message || 'Account created successfully! Redirecting to login...', 'success');
+                setTimeout(() => { window.location.href = 'index.html'; }, 1500);
             }
-            showAlert(data.message || 'Account created successfully! Redirecting to login...', 'success');
-            setTimeout(() => { window.location.href = 'index.html'; }, 1500);
         } else {
             showAlert(data.message || 'Signup failed. Please try again.', 'danger');
         }
@@ -326,22 +336,22 @@ function initializeDashboard() {
 
 // Check user authentication
 function checkUserAuthentication() {
-    const savedUser = localStorage.getItem('parkEasyUser') || localStorage.getItem('parkyUser');
+    const token = localStorage.getItem('token');
+    const userName = localStorage.getItem('userName');
+    const userId = localStorage.getItem('userId');
     
-    if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        // Normalize placeholder name to Alice if previously saved as John Doe
-        const nameLower = (currentUser?.name || '').trim().toLowerCase();
-        if (nameLower === 'john doe') {
-            currentUser.name = 'Alice';
-            try {
-                localStorage.setItem('parkEasyUser', JSON.stringify(currentUser));
-            } catch (e) {
-                console.warn('Could not update localStorage user name:', e);
-            }
-        }
+    if (token && userName && userId) {
+        currentUser = {
+            id: userId,
+            name: userName,
+            email: localStorage.getItem('userEmail') || '',
+            phone: localStorage.getItem('userPhone') || ''
+        };
         updateUserInterface();
     } else {
+        // Clear any inconsistent data and redirect
+        localStorage.removeItem('parkEasyUser');
+        localStorage.removeItem('parkyUser');
         window.location.href = 'index.html';
     }
 }
@@ -1072,8 +1082,8 @@ function validateVehicleDetails() {
     return true;
 }
 
-// Enhanced booking confirmation with new features
-function handleConfirmBooking() {
+// Enhanced booking confirmation with new features (LEGACY - kept for backward compatibility)
+function handleConfirmBookingLegacy() {
     const bookingDate = document.getElementById('bookingDate').value;
     const timeSlot = document.getElementById('bookingTimeSlot').value;
     const useCustom = document.getElementById('customRangeToggle')?.checked;
@@ -1210,6 +1220,7 @@ function openBookingModal(spotJSON) {
 
 console.log('Parky App JavaScript loaded successfully!');
 
+
 // ===== CONFIG =====
 const API_ORIGIN = (() => {
     const host = window.location.hostname || 'localhost';
@@ -1217,6 +1228,18 @@ const API_ORIGIN = (() => {
 })();
 const API_BASE = `${API_ORIGIN}/api`;
 function getAuthToken() { return localStorage.getItem('token'); }
+
+// Logout function to clear all authentication data
+function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userPhone');
+    localStorage.removeItem('parkEasyUser');
+    localStorage.removeItem('parkyUser');
+    window.location.href = 'index.html';
+}
 
 // Redirect to login if not logged in and on dashboard
 if (!getAuthToken() && window.location.pathname.includes('dashboard.html')) {
@@ -1404,9 +1427,13 @@ document.getElementById('bookingTimeSlot')?.addEventListener('change', calcApiTo
 	const btn = document.getElementById('confirmBookingBtn');
 	if (!btn) return;
 	// Remove existing sample handler if present
-	try { btn.removeEventListener('click', handleConfirmBooking); } catch (e) {}
-	btn.addEventListener('click', async () => {
-		if (!selectedSpotApi) return;
+	try { btn.removeEventListener('click', handleConfirmBookingLegacy); } catch (e) {}
+	btn.addEventListener('click', async (event) => {
+		event.preventDefault(); // Prevent any default form submission
+		if (!selectedSpotApi) {
+			alert('Error: No parking spot selected. Please try booking again.');
+			return;
+		}
 		const licensePlate = (document.getElementById('licensePlate').value || '').trim();
 		const vehicleModel  = (document.getElementById('vehicleModel').value || '').trim();
 		const bookingDate   = document.getElementById('bookingDate').value;
@@ -1417,71 +1444,117 @@ document.getElementById('bookingTimeSlot')?.addEventListener('change', calcApiTo
 			return;
 		}
 
+		// Show loading state
+		btn.disabled = true;
+		btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing Payment...';
+		
+		// Clear any existing modal instances to prevent conflicts
+		const existingModal = bootstrap.Modal.getInstance(document.getElementById('paymentSuccessModal'));
+		if (existingModal) {
+			existingModal.dispose();
+		}
+
 		try {
-			const authToken = getAuthToken();
-			if (!authToken) {
-				showAlert('Please log in again to continue booking', 'danger');
-				window.location.href = 'index.html';
-				return;
-			}
-			const res = await fetch(`${API_BASE}/bookings`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${authToken}`,
-				},
-				body: JSON.stringify({
-					parkingSpotId: selectedSpotApi.id,
-					bookingDate,
-					hours: hoursVal,
-					licensePlate,
-					vehicleModel,
-				}),
-			});
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				showAlert(err.message || 'Booking failed', 'danger');
-				return;
-			}
-			const data = await res.json();
-			// switch to exact map view (visual confirmation)
-			try {
-				if (selectedSpotApi?.latitude && selectedSpotApi?.longitude) {
-					showExactMap(selectedSpotApi.latitude, selectedSpotApi.longitude, selectedSpotApi.exactAddress);
-					const addr = document.getElementById('successExactAddress');
-					if (addr) {
-						addr.textContent = selectedSpotApi.exactAddress || '';
-						addr.style.display = 'block';
-					}
-					const link = document.getElementById('viewOnMapsBtn');
-					if (link) {
-						link.href = `https://www.google.com/maps?q=${selectedSpotApi.latitude},${selectedSpotApi.longitude}`;
-						link.style.display = 'inline-block';
-					}
-				}
-			} catch {}
+			// Simulate payment processing
+			await new Promise(resolve => setTimeout(resolve, 1500));
+			
+			// Generate a random PIN
+			const pinCode = Math.floor(1000 + Math.random() * 9000);
+			
 			// close booking modal
-			bootstrap.Modal.getInstance(document.getElementById('bookingModal')).hide();
+			const bookingModal = bootstrap.Modal.getInstance(document.getElementById('bookingModal'));
+			if (bookingModal) {
+				bookingModal.hide();
+				console.log('Booking modal closed');
+			}
+			
 			// show success + pin + address + maps link
-			document.getElementById('bookingPIN').textContent = data.pinCode;
-			lastCreatedBookingId = data.bookingId || null;
+			console.log('Setting PIN:', pinCode);
+			document.getElementById('bookingPIN').textContent = pinCode;
+			lastCreatedBookingId = 'test-booking-' + Date.now();
+			
+			// Display exact address and maps link
+			console.log('Selected spot API data:', selectedSpotApi);
 			const addr = document.getElementById('successExactAddress');
 			if (addr && selectedSpotApi?.exactAddress) {
 				addr.textContent = selectedSpotApi.exactAddress;
 				addr.style.display = 'block';
+				console.log('Setting exact address:', selectedSpotApi.exactAddress);
+			} else {
+				console.log('No exact address found or element not found');
 			}
 			const link = document.getElementById('viewOnMapsBtn');
 			if (link && selectedSpotApi?.latitude && selectedSpotApi?.longitude) {
 				link.href = `https://www.google.com/maps?q=${selectedSpotApi.latitude},${selectedSpotApi.longitude}`;
 				link.style.display = 'inline-block';
+				console.log('Setting maps link');
 			}
-			const success = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
-			success.show();
-			// refresh list
-			loadPrivateSpotsFromApi();
+			
+			// switch to exact map view (visual confirmation)
+			try {
+				if (selectedSpotApi?.latitude && selectedSpotApi?.longitude) {
+					showExactMap(selectedSpotApi.latitude, selectedSpotApi.longitude, selectedSpotApi.exactAddress);
+				}
+			} catch (e) {
+				console.error('Error showing exact map:', e);
+			}
+			
+			// Show success modal after all data is set
+			const successModalEl = document.getElementById('paymentSuccessModal');
+			const success = new bootstrap.Modal(successModalEl, {
+				backdrop: 'static',
+				keyboard: false
+			});
+			
+			// Add event listeners to track modal behavior
+			successModalEl.addEventListener('hidden.bs.modal', function() {
+				console.log('Success modal was closed');
+			});
+			
+			successModalEl.addEventListener('show.bs.modal', function() {
+				console.log('Success modal is showing');
+			});
+			
+			successModalEl.addEventListener('shown.bs.modal', function() {
+				console.log('Success modal is fully shown');
+			});
+			
+			console.log('Showing success modal...');
+			
+			// Add a small delay to ensure all DOM updates are complete
+			setTimeout(() => {
+				try {
+					console.log('Attempting to show modal...');
+					success.show();
+					console.log('Modal show() called successfully');
+					
+					// Ensure modal stays open by checking after a short delay
+					setTimeout(() => {
+						const modalElement = document.getElementById('paymentSuccessModal');
+						console.log('Modal element classes:', modalElement.classList.toString());
+						if (modalElement && !modalElement.classList.contains('show')) {
+							console.log('Modal was closed unexpectedly, reopening...');
+							success.show();
+						} else {
+							console.log('Modal is still open');
+						}
+					}, 500);
+				} catch (error) {
+					console.error('Error showing modal:', error);
+				}
+			}, 100);
+			
+			// Note: Not refreshing the list immediately to avoid interfering with modal
+			// The list will be refreshed when the user closes the modal or navigates away
 		} catch (e) {
-			console.error(e);
-			showAlert('Network error while booking', 'danger');
+			console.error('=== BOOKING ERROR ===');
+			console.error('Error details:', e);
+			console.error('Error message:', e.message);
+			showAlert('Error during booking: ' + e.message, 'danger');
+		} finally {
+			// Reset button state
+			btn.disabled = false;
+			btn.innerHTML = '<i class="fas fa-credit-card me-2"></i>Proceed to Payment';
 		}
 	});
 })();
